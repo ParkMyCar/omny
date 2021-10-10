@@ -1,6 +1,6 @@
 import React from "react";
 import mapboxgl from "mapbox-gl";
-import GeoJSON from "geojson";
+import { fetchGeoJson, Lines } from "./api";
 
 import DATA from "./d.json";
 
@@ -49,44 +49,75 @@ export class MapComponent extends React.Component<{}, MapboxComponentState> {
 
   componentDidUpdate() {
     if (this.state.mapLoaded) {
-      this.renderLines();
+      // @ts-ignore
+      fetchGeoJson().then((lines) => {
+        this.renderLines(lines);
+      });
     }
   }
 
-  renderLines() {
-    const layerId = "d";
+  renderLines(lines: Lines) {
+    for (const line of lines) {
+      const layerId = line.properties.route_id;
 
-    console.log("rendering!");
+      if (this.map?.getSource(layerId)) {
+        // @ts-ignore
+        this.map.getSource(layerId).setData(line);
+      } else {
+        this.map?.addSource(layerId, {
+          type: "geojson",
+          // @ts-ignore
+          data: line,
+        });
+      }
 
-    // @ts-ignore
-    this.map.addSource(layerId, {
-      type: "geojson",
+      if (!this.map?.getLayer(layerId)) {
+        const layer = {
+          id: layerId,
+          type: "line",
+          source: layerId,
+          layout: {
+            "line-join": "miter",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              1,
+              13,
+              2,
+              14,
+              5,
+            ],
+            "line-offset": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              ["get", "offset"],
+              13,
+              ["*", ["get", "offset"], 1.5],
+              14,
+              ["*", ["get", "offset"], 3],
+            ],
+          },
+        };
+        if (line.properties.color) {
+          // @ts-ignore
+          layer.paint["line-color"] = line.properties.color;
+        }
+        // @ts-ignore
+        this.map.addLayer(layer);
+      }
+
       // @ts-ignore
-      data: DATA,
-    });
-
-    console.log(DATA);
-
-    const layer = {
-      id: layerId,
-      type: "line",
-      source: layerId,
-      layout: {
-        "line-join": "miter",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 13, 2, 14, 5],
-        "line-color": "#FF6600",
-      },
-    };
-
-    // @ts-ignore
-    this.map.addLayer(layer);
-    // @ts-ignore
-    this.map.on("click", layerId, (e) => {
-      console.log("clicked on layer!");
-    });
+      this.map.on("click", layerId, (e) => {
+        console.log("clicked on layer! id: " + layerId);
+      });
+    }
   }
 
   componentWillUnmount() {
