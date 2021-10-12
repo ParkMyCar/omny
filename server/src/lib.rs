@@ -1,9 +1,14 @@
+#[macro_use]
+extern crate tracing;
+
 use geojson::Feature;
 use gtfs_structures::Gtfs;
 use itertools::Itertools;
 use rgb::RGB8;
 use serde::Serialize;
 use std::{ops::Deref, path::Path, sync::Arc};
+
+pub mod static_data;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct RouteProperties {
@@ -57,22 +62,44 @@ impl Deref for Route {
 #[derive(Clone, Debug)]
 pub struct OMNYGeoJson {
     pub routes: Vec<Route>,
-    gtfs: Arc<Gtfs>,
+    // gtfs: Arc<Gtfs>,
 }
 
 impl OMNYGeoJson {
-    pub fn from_gtfs<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let gtfs = Gtfs::from_path(path).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-        let routes = OMNYGeoJson::trip_shapes(&gtfs)
+    pub fn from_gtfs<P: AsRef<Path>>(
+        subway: P,
+        path: P,
+        lirr: P,
+        metro_north: P,
+        nj_transit: P,
+    ) -> anyhow::Result<Self> {
+        let subway_gtfs = Gtfs::from_path(subway).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let path_gtfs = Gtfs::from_path(path).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let lirr_gtfs = Gtfs::from_path(lirr).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let metro_north_gtfs = Gtfs::from_path(metro_north).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        let nj_transit_gtfs = Gtfs::from_path(nj_transit).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+        let subway_shapes = OMNYGeoJson::trip_shapes(&subway_gtfs);
+        let path_shapes = OMNYGeoJson::trip_shapes(&path_gtfs);
+        let lirr_shapes = OMNYGeoJson::trip_shapes(&lirr_gtfs);
+        let metro_north_shapes = OMNYGeoJson::trip_shapes(&metro_north_gtfs);
+        let nj_transit_shapes = OMNYGeoJson::trip_shapes(&nj_transit_gtfs);
+
+
+        let routes = subway_shapes
             .into_iter()
             .map(|feature| Route(feature))
+            .chain(path_shapes.into_iter().map(|feature| Route(feature)))
+            .chain(lirr_shapes.into_iter().map(|feature| Route(feature)))
+            .chain(metro_north_shapes.into_iter().map(|feature| Route(feature)))
+            .chain(nj_transit_shapes.into_iter().map(|feature| Route(feature)))
             .collect::<Vec<Route>>();
 
         println!("num routes: {}", routes.len());
 
         Ok(OMNYGeoJson {
             routes,
-            gtfs: Arc::new(gtfs),
+            // gtfs: Arc::new(gtfs),
         })
     }
 

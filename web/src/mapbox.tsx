@@ -57,8 +57,27 @@ export class MapComponent extends React.Component<{}, MapboxComponentState> {
   }
 
   renderLines(lines: Lines) {
+    const offsets = {};
     for (const line of lines) {
       const layerId = line.properties.route_id;
+
+      // @ts-ignore
+      if (offsets[line.properties.color] === undefined) {
+        // @ts-ignore
+        offsets[line.properties.color] = [];
+      }
+
+      if (!this.map?.getSource(layerId)) {
+        // @ts-ignore
+        offsets[line.properties.color].push(line.properties.route_id);
+      }
+      // @ts-ignore
+      const offset = offsets[line.properties.color].length - 1;
+      console.log(
+        layerId + " offset: " + line.properties.color + ", " + offset
+      );
+
+      line.properties.offset = offset.toString();
 
       if (this.map?.getSource(layerId)) {
         // @ts-ignore
@@ -97,11 +116,11 @@ export class MapComponent extends React.Component<{}, MapboxComponentState> {
               ["linear"],
               ["zoom"],
               8,
-              ["get", "offset"],
+              offset,
               13,
-              ["*", ["get", "offset"], 1.5],
+              offset * 1.5,
               14,
-              ["*", ["get", "offset"], 3],
+              offset * 3,
             ],
           },
         };
